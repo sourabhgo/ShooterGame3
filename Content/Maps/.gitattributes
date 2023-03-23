@@ -1,0 +1,11 @@
+Highrise_BuiltData.uasset filter=lfs diff=lfs merge=lfs -text
+Sanctuary_BuiltData.uasset filter=lfs diff=lfs merge=lfs -text
+Highrise_Collisions_Temp_BuiltData.uasset filter=lfs diff=lfs merge=lfs -text
+Highrise_Lights_BuiltData.uasset filter=lfs diff=lfs merge=lfs -text
+Highrise_Vista_BuiltData.uasset filter=lfs diff=lfs merge=lfs -text
+SanctuaryLabel.uasset filter=lfs diff=lfs merge=lfs -text
+StartupLabel.uasset filter=lfs diff=lfs merge=lfs -text
+ShooterEntry_BuiltData.uasset filter=lfs diff=lfs merge=lfs -text
+HighriseLabel.uasset filter=lfs diff=lfs merge=lfs -text
+Highrise_Audio_BuiltData.uasset filter=lfs diff=lfs merge=lfs -text
+Highrise_Gameplay_BuiltData.uasset filter=lfs diff=lfs merge=lfs -text
