@@ -1,0 +1,306 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+/**
+ * Movement component meant for use with Pawns.
+ */
+
+#pragma once
+#include "GameFramework/GameNetworkManager.h"
+#include "ShooterPlayerCameraManager.h"
+#include "ShooterCharacterMovement.generated.h"
+
+
+//Custom Movement mode enum
+UENUM(BlueprintType)
+enum ECustomMovementMode
+{
+	CMOVE_None			UMETA(Hidden),
+	CMOVE_Teleport			UMETA(DisplayName = "Teleport"),
+	CMOVE_Jetpack			UMETA(DisplayName = "Jetpack"),
+	CMOVE_Rewind			UMETA(DisplayName = "Rewind"),
+	CMOVE_Shrink			UMETA(DisplayName = "Shrink"),
+	CMOVE_Freeze			UMETA(DisplayName = "Freeze"),
+	CMOVE_WallRun		UMETA(DisplayName = "Wall Run"),
+	CMOVE_MAX			UMETA(Hidden),
+};
+
+
+UCLASS()
+class UShooterCharacterMovement : public UCharacterMovementComponent
+{
+	GENERATED_UCLASS_BODY()
+
+	virtual float GetMaxSpeed() const override;
+
+	class FSavedMove_Shooter : public FSavedMove_Character
+	{
+	public:
+		enum CompressedFlags
+		{
+			//Reserving flags,
+			FLAG_Custom_0 = 0x10,
+			FLAG_Jetpack = 0x20,
+			FLAG_Custom_2 = 0x40,
+			FLAG_Custom_3 = 0x80,
+		};
+
+		//data for teleporting
+		uint8 Saved_bWantsToTeleport : 1;
+
+		//data for jetpacking
+		uint8 Saved_bWantsToJetpack : 1;
+		float SavedJetpackFuel;
+		FVector SavedMoveDirection;
+
+		//data for time rewind
+		uint8 Saved_bWantsToRewind : 1;
+		std::list<FTransform> SavedPositions;
+
+		//data for shrink
+		uint8 Saved_bWantsToShrink:1;
+
+		//data for freeze
+		uint8 Saved_bWantsToFreeze : 1;
+
+		//wall run
+		uint8 Saved_bWallRunIsRight : 1;
+
+		FSavedMove_Shooter();
+
+		virtual bool CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const override;
+		virtual void Clear() override;
+		virtual uint8 GetCompressedFlags() const override;
+		virtual void SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& NewAccel, FNetworkPredictionData_Client_Character& ClientData) override;
+		virtual void PrepMoveFor(ACharacter* C) override;
+	};
+
+	class FNetworkPredictionData_Client_Shooter : public FNetworkPredictionData_Client_Character
+	{
+	public:
+		FNetworkPredictionData_Client_Shooter(const UCharacterMovementComponent& ClientMovement);
+
+		typedef FNetworkPredictionData_Client_Character Super;
+
+		virtual FSavedMovePtr AllocateNewMove() override;
+	};
+
+	UPROPERTY(Transient) AShooterCharacter* ShooterCharacterOwner;
+
+public:
+
+	//Character Movement Component functions: public
+
+	UShooterCharacterMovement();
+
+	UFUNCTION(BlueprintPure) bool IsCustomMovementMode(ECustomMovementMode InCustomMovementMode) const;
+
+	virtual FNetworkPredictionData_Client* GetPredictionData_Client() const override;
+
+	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
+	virtual void UpdateCharacterStateAfterMovement(float DeltaSeconds) override;
+
+
+
+	//Proxy Replication
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+protected:
+
+	//Character Movement Component functions: protected
+
+	virtual void InitializeComponent() override;
+
+	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
+
+	virtual void OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity) override;
+	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
+	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
+
+	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
+
+public:
+	//data
+
+	//Interface
+	UFUNCTION(BlueprintCallable) void TeleportPressed();
+	UFUNCTION(BlueprintCallable) void JetpackPressed();
+	UFUNCTION(BlueprintCallable) void JetpackReleased();
+	UFUNCTION(BlueprintCallable) void RewindPressed();
+	UFUNCTION(BlueprintCallable) void ShrinkPressed();
+	UFUNCTION(BlueprintCallable) void FreezePressed();
+
+	//teleportation
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Teleport")
+		float TeleportDistance;
+
+	//jetpack
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+		FVector MoveDirection;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Jetpack", meta = (ClampMin = 0))
+		float MaxJetpackFuel;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Jetpack", meta = (ClampMin = 0))
+		float JetpackFuelConsumptionRate;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Jetpack", meta = (ClampMin = 0))
+		float JetpackFuelRefillRate;
+	UPROPERTY(BlueprintReadOnly, Category = "Character Movement: Jetpack")
+		float JetpackFuel;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Jetpack", meta = (ClampMin = 0))
+		float JetpackForce;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Jetpack")
+		float JetpackAccelerationModifier;
+
+	//time rewind
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Rewind", meta = (ClampMin = 0, ClampMax = 1))
+		float MaxReplayTime;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Rewind", meta = (ClampMin = 0, ClampMax = 3))
+		float RewindRecordTime;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Character Movement: Rewind", meta = (ClampMin = 0, ClampMax = 0.1))
+		float RewindRecordInterval;
+
+	//shrink data
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Shrink")
+		float InterpTime = 1.0; //time to interpolate
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Shrink")
+		float ShrinkTime = 10.0; //time to remain shrunk
+
+	//WallRun
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Wall Run")
+		UCurveFloat* WallRunGravityScaleCurve;
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Wall Run") float MinWallRunSpeed = 200.f;
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Wall Run") float MaxWallRunSpeed = 800.f;
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Wall Run") float MaxVerticalWallRunSpeed = 200.f;
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Wall Run") float WallRunPullAwayAngle = 75;
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Wall Run") float WallAttractionForce = 200.f;
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Wall Run") float MinWallRunHeight = 50.f;
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Wall Run") float WallJumpOffForce = 300.f;
+
+	//WallJump
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly, Category = "Character Movement: Wall Jump") float LateralJumpStrength = 400;
+
+public:
+	//functions
+
+	//shrink
+	bool Is_ShrinkActive();
+	void Set_ShrinkActive(bool isactive);
+
+	//freeze
+	bool Is_FreezeActive();
+	void Set_FreezeActive(bool isactive);
+
+private:
+
+	bool Safe_bWantsToTeleport : 1;
+	bool Safe_bWantsToJetpack : 1;
+	bool Safe_bWantsToRewind : 1;
+	uint8 Safe_bWantsToShrink : 1;
+	uint8 Safe_bWantsToFreeze : 1;
+	uint8 Safe_bWallRunIsRight : 1;
+
+	//set in constructor upon calculation
+	UPROPERTY(EditDefaultsOnly, Category = "Character Movement: Shrink")
+	UCurveFloat* ShrinkCurveFloat;
+	UPROPERTY(EditDefaultsOnly, Category = "Character Movement: Shrink")
+	UCurveFloat* UnShrinkCurveFloat;
+
+	float CacheShrinkTime;
+	float CacheShrinkTimer;
+	float CacheUnShrinkTime;
+	bool IsCharShrunk;
+	bool HasShrinkStarted;
+	bool HasShrinkFinished;	
+	bool HasShrinkTimerFinished;
+	bool HasUnShrinkFinished;
+	UPROPERTY(ReplicatedUsing = OnRep_ShrinkHUDValue)
+		float ShrinkHUDValue;
+
+	bool IsFreezeActive;
+	UPROPERTY(EditDefaultsOnly)
+		float FreezeTime;
+	float CacheFreezeTimer;
+	bool IsCharFrozen;
+	bool HasFreezeTimerStarted;
+	bool HasFreezeTimerFinished;
+
+	std::list<FTransform> RecordedPositions;
+	std::list<FTransform>::const_iterator iter;
+	bool RewindActive;
+	bool RewindHasStarted;
+	float cacheRewindTime;
+	float cacheTimeRecord;
+	float cacheTimeDelta;
+	float cacheTimeStart;
+	float RewindReplayInterval;
+	FTransform curr, prev;
+	bool inputEnabled;
+	float RewindHUDValue;
+
+private:
+
+	//functions
+
+	//teleport
+	void EnterTeleport(EMovementMode PrevMode, ECustomMovementMode PrevCustomMode);
+	void ExitTeleport();
+	bool CanTeleport() const;
+	void PhysTeleport(float deltaTime, int32 Iterations);
+	UFUNCTION(Server, Reliable) void Server_SetTeleport(bool IsTeleport);
+
+	//jetpack
+	void EnterJetpack(EMovementMode PrevMode, ECustomMovementMode PrevCustomMode);
+	void ExitJetpack();
+	bool CanJetpack() const;
+	void PhysJetpack(float deltaTime, int32 Iterations);
+	virtual float GetMaxAcceleration() const override;
+
+	//time rewind
+	void EnterRewind(EMovementMode PrevMode, ECustomMovementMode PrevCustomMode);
+	void ExitRewind();
+	bool CanRewind() const; 
+	void PhysRewind(float deltaTime, int32 Iterations);
+	UFUNCTION(Server, Reliable) void Server_SetRewind(bool IsRewind);
+
+	//shrink
+	void EnterShrink(EMovementMode PrevMode, ECustomMovementMode PrevCustomMode);
+	void ExitShrink();
+	bool CanShrink() const; 
+	void PhysShrink(float deltaTime, int32 Iterations);
+	UFUNCTION(Server, Reliable) void Server_Set_ShrinkActive(bool isactive);
+	UPROPERTY(ReplicatedUsing = OnRep_ScaleValue)
+	float ScaleValue;
+	UFUNCTION()
+	void OnRep_ScaleValue();
+	UFUNCTION()
+		void OnRep_ShrinkHUDValue();
+		
+	
+	//freeze gun
+	void EnterFreeze(EMovementMode PrevMode, ECustomMovementMode PrevCustomMode);
+	void ExitFreeze();
+	bool CanFreeze() const; 
+	void PhysFreeze(float deltaTime, int32 Iterations);
+	UFUNCTION(Server, Reliable) void Server_Set_FreezeActive(bool isactive);
+	void PhysFreeze();
+	void FreezePlayer(bool value);
+	UFUNCTION(Server, Reliable) void Server_FreezePlayer(bool value);
+
+	//wall run
+	UFUNCTION(BlueprintPure) bool IsWallRunning() const { return IsCustomMovementMode(CMOVE_WallRun); }
+	UFUNCTION(BlueprintPure) bool WallRunningIsRight() const { return Safe_bWallRunIsRight; }
+	virtual bool CanAttemptJump() const override;
+	virtual bool DoJump(bool bReplayingMoves) override;
+	bool TryWallRun();
+	void PhysWallRun(float deltaTime, int32 Iterations);
+
+
+	//query and helper functions
+	bool IsServer() const;
+	void AddKeyToCurve(UCurveFloat* Curve, float Time, float Value);
+	//helper functions for capsule dimensions
+	float CapR() const;
+	float CapHH() const;
+
+};
+
+
+
