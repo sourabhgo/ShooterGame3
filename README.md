@@ -34,4 +34,5 @@ Note - Blueprint Settings
 ![BP Settings](https://user-images.githubusercontent.com/24374437/227436083-82674117-8492-4431-b4b1-a1a6e4e651c4.png)
 
 Testing & Other Settings
-![Testing   Settings](https://user-images.githubusercontent.com/24374437/227436128-17789b66-c1c7-48fc-9003-8a45003aff76.png)
+All functionalities have been made as robust as possible.
+Added Large Uasset files Highrise_BuiltinData.uasset and Sanctuary_BuiltinData.uasset using Git Large File System.
